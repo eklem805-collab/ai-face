@@ -36,32 +36,29 @@ class YoloFaceDetector(private val context: Context) {
     private var isInitialized = false
 
     fun initialize(modelPath: String = "yolov8n-face.tflite"): Boolean {
-        return try {
-            val model = FileUtil.loadMappedFile(context, modelPath)
-            val options = Interpreter.Options().apply {
-                setNumThreads(4)
-                // Use NNAPI if available
-                setUseNNAPI(true)
-            }
-            interpreter = Interpreter(model, options)
-            isInitialized = true
-            Log.i(TAG, "YOLO model loaded: $modelPath")
-            Log.i(TAG, "Input tensor: ${interpreter?.getInputTensor(0)?.shape()?.contentToString()}")
-            Log.i(TAG, "Output tensor: ${interpreter?.getOutputTensor(0)?.shape()?.contentToString()}")
-            true
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to load model $modelPath: ${e.message}")
-            // Try alternative model
+        // Try all possible model names
+        val modelsToTry = listOf(modelPath, "yolov8n-face.tflite", "yolov8l-face.tflite", "yolo-face.tflite", "yolov8-face.tflite")
+        for (mp in modelsToTry.distinct()) {
             try {
-                val model = FileUtil.loadMappedFile(context, "yolov8l-face.tflite")
-                interpreter = Interpreter(model)
+                Log.i(TAG, "Trying to load YOLO model: $mp")
+                val model = FileUtil.loadMappedFile(context, mp)
+                val options = Interpreter.Options().apply {
+                    setNumThreads(4)
+                    // Don't use NNAPI for compatibility - some devices fail with NNAPI
+                    setUseNNAPI(false)
+                }
+                interpreter = Interpreter(model, options)
                 isInitialized = true
-                true
-            } catch (e2: Exception) {
-                Log.e(TAG, "Failed to load alternative model: ${e2.message}")
-                false
+                Log.i(TAG, "YOLO model loaded SUCCESS: $mp size ${model.capacity()}")
+                Log.i(TAG, "Input tensor: ${interpreter?.getInputTensor(0)?.shape()?.contentToString()}")
+                Log.i(TAG, "Output tensor: ${interpreter?.getOutputTensor(0)?.shape()?.contentToString()}")
+                return true
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to load $mp: ${e.message}")
             }
         }
+        Log.e(TAG, "All YOLO models failed to load, will use ML Kit")
+        return false
     }
 
     data class YoloResult(
