@@ -39,26 +39,16 @@ Starting a Gradle Daemon (subsequent builds will be faster)
 > Task :app:compileDebugShaders NO-SOURCE
 > Task :app:generateDebugAssets UP-TO-DATE
 > Task :app:mergeDebugAssets
-> Task :app:processDebugManifestForPackage
 > Task :app:desugarDebugFileDependencies
-> Task :app:processDebugResources
 > Task :app:compressDebugAssets
-> Task :app:checkDebugDuplicateClasses
 > Task :app:mergeDebugStartupProfile
-> Task :app:compileDebugKotlin
-w: file:///home/runner/work/ai-face/ai-face/app/src/main/java/com/aiface/detector/MainActivity.kt:129:14 'setTargetAspectRatio(Int): Preview.Builder' is deprecated. Deprecated in Java
-w: file:///home/runner/work/ai-face/ai-face/app/src/main/java/com/aiface/detector/MainActivity.kt:133:14 'setTargetAspectRatio(Int): ImageAnalysis.Builder' is deprecated. Deprecated in Java
-
-> Task :app:mergeExtDexDebug
-> Task :app:compileDebugJavaWithJavac
-> Task :app:dexBuilderDebug
-> Task :app:processDebugJavaRes
-> Task :app:mergeDebugGlobalSynthetics
 > Task :app:mergeDebugJniLibFolders
+> Task :app:processDebugManifestForPackage
+> Task :app:checkDebugDuplicateClasses
+> Task :app:processDebugResources
+> Task :app:mergeExtDexDebug
 > Task :app:mergeLibDexDebug
-> Task :app:mergeProjectDexDebug
 > Task :app:mergeDebugNativeLibs
-> Task :app:mergeDebugJavaResource
 > Task :app:validateSigningDebug
 > Task :app:writeDebugAppMetadata
 > Task :app:writeDebugSigningConfigVersions
@@ -66,9 +56,19 @@ w: file:///home/runner/work/ai-face/ai-face/app/src/main/java/com/aiface/detecto
 > Task :app:stripDebugDebugSymbols
 Unable to strip the following libraries, packaging them as they are: libface_detector_v2_jni.so, libimage_processing_util_jni.so, libonnxruntime.so, libonnxruntime4j_jni.so, libtensorflowlite_gpu_jni.so, libtensorflowlite_jni.so.
 
+> Task :app:compileDebugKotlin
+w: file:///home/runner/work/ai-face/ai-face/app/src/main/java/com/aiface/detector/MainActivity.kt:129:14 'setTargetAspectRatio(Int): Preview.Builder' is deprecated. Deprecated in Java
+w: file:///home/runner/work/ai-face/ai-face/app/src/main/java/com/aiface/detector/MainActivity.kt:133:14 'setTargetAspectRatio(Int): ImageAnalysis.Builder' is deprecated. Deprecated in Java
+
+> Task :app:compileDebugJavaWithJavac
+> Task :app:dexBuilderDebug
+> Task :app:mergeDebugGlobalSynthetics
+> Task :app:processDebugJavaRes
+> Task :app:mergeProjectDexDebug
+> Task :app:mergeDebugJavaResource
 > Task :app:packageDebug
 > Task :app:createDebugApkListingFileRedirect
 > Task :app:assembleDebug
 
-BUILD SUCCESSFUL in 2m 11s
+BUILD SUCCESSFUL in 2m 17s
 40 actionable tasks: 40 executed
