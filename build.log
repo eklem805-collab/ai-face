@@ -15,17 +15,16 @@ Starting a Gradle Daemon (subsequent builds will be faster)
 > Task :app:preDebugBuild UP-TO-DATE
 > Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
 > Task :app:checkKotlinGradlePluginConfigurationErrors
-> Task :app:dataBindingMergeDependencyArtifactsDebug
 > Task :app:generateDebugResValues
+> Task :app:dataBindingMergeDependencyArtifactsDebug
 > Task :app:generateDebugResources
 > Task :app:packageDebugResources
-> Task :app:mergeDebugResources
 > Task :app:parseDebugLocalResources
-> Task :app:checkDebugAarMetadata
-> Task :app:dataBindingGenBaseClassesDebug
 > Task :app:mapDebugSourceSetPaths
+> Task :app:checkDebugAarMetadata
 > Task :app:createDebugCompatibleScreenManifests
 > Task :app:extractDeepLinksDebug
+> Task :app:mergeDebugResources
 
 > Task :app:processDebugMainManifest
 [org.tensorflow:tensorflow-lite:2.14.0] /home/runner/.gradle/caches/transforms-4/05cdf13a9a45342502a50daa69295ea0/transformed/jetified-tensorflow-lite-2.14.0/AndroidManifest.xml Warning:
@@ -33,13 +32,14 @@ Starting a Gradle Daemon (subsequent builds will be faster)
 [org.tensorflow:tensorflow-lite-support:0.4.4] /home/runner/.gradle/caches/transforms-4/ed84e7474b3e9518c83909c2fb61fb4d/transformed/jetified-tensorflow-lite-support-0.4.4/AndroidManifest.xml Warning:
 	Namespace 'org.tensorflow.lite.support' is used in multiple modules and/or libraries: org.tensorflow:tensorflow-lite-support:0.4.4, org.tensorflow:tensorflow-lite-support-api:0.4.4. Please ensure that all modules and libraries have a unique namespace. For more information, See https://developer.android.com/studio/build/configure-app-module#set-namespace
 
+> Task :app:dataBindingGenBaseClassesDebug
 > Task :app:processDebugManifest
+> Task :app:processDebugManifestForPackage
 > Task :app:javaPreCompileDebug
 > Task :app:mergeDebugShaders
 > Task :app:compileDebugShaders NO-SOURCE
 > Task :app:generateDebugAssets UP-TO-DATE
 > Task :app:mergeDebugAssets
-> Task :app:processDebugManifestForPackage
 > Task :app:desugarDebugFileDependencies
 > Task :app:compressDebugAssets
 > Task :app:processDebugResources
@@ -58,8 +58,8 @@ w: file:///home/runner/work/ai-face/ai-face/app/src/main/java/com/aiface/detecto
 > Task :app:mergeLibDexDebug
 > Task :app:mergeDebugJniLibFolders
 > Task :app:mergeProjectDexDebug
-> Task :app:mergeDebugNativeLibs
 > Task :app:mergeDebugJavaResource
+> Task :app:mergeDebugNativeLibs
 > Task :app:validateSigningDebug
 > Task :app:writeDebugAppMetadata
 > Task :app:writeDebugSigningConfigVersions
@@ -71,5 +71,5 @@ Unable to strip the following libraries, packaging them as they are: libface_det
 > Task :app:createDebugApkListingFileRedirect
 > Task :app:assembleDebug
 
-BUILD SUCCESSFUL in 2m 2s
+BUILD SUCCESSFUL in 2m 8s
 40 actionable tasks: 40 executed
