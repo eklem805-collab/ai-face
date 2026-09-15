@@ -1,10 +1,16 @@
 <resources>
-    <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
-    <color name="primary">#FF6200EE</color>
-    <color name="primary_variant">#FF3700B3</color>
-    <color name="secondary">#FF03DAC5</color>
-    <color name="box_color">#FF00FF00</color>
-    <color name="landmark_color">#FFFF00FF</color>
-    <color name="text_bg">#88000000</color>
+    <color name="black">#FF1A0B2E</color>
+    <color name="white">#FFE0AAFF</color>
+    <color name="primary">#FF9D4EDD</color>
+    <color name="primary_variant">#FF4A148C</color>
+    <color name="secondary">#FFFF79C6</color>
+    <color name="box_color">#FFE0AAFF</color>
+    <color name="landmark_color">#FFFF79C6</color>
+    <color name="text_bg">#E61A0B2E</color>
+    <color name="purple_dark">#FF1A0B2E</color>
+    <color name="purple_mid">#FF4A148C</color>
+    <color name="purple_light">#FF9D4EDD</color>
+    <color name="purple_glow">#FFE0AAFF</color>
+    <color name="pink_neon">#FFFF79C6</color>
+    <color name="cyan_pixel">#FFC8B6FF</color>
 </resources>
