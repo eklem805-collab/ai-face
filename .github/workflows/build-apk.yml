@@ -72,9 +72,10 @@ jobs:
         run: |
           cp app/build/outputs/apk/debug/app-debug.apk ./ai-face-detector.apk || echo "No debug APK"
           cp app/build/outputs/apk/debug/app-debug.apk ./app-debug.apk || echo "No debug APK2"
+          cp app/build/outputs/apk/debug/app-debug.apk ./ai-face-detector-purple.apk || echo "No debug APK purple"
           ls -lh *.apk || true
 
-      - name: Upload APK via Contents API to main branch (modern APK for tablets)
+      - name: Upload APK via Contents API - PURPLE MODERN for tablets
         if: always() && github.ref == 'refs/heads/main'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -83,21 +84,39 @@ jobs:
             echo "No APK to upload"
             exit 0
           fi
-          echo "Uploading modern APK via Contents API..."
-          APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
-          DEST="ai-face-detector-modern.apk"
-          CONTENT=$(base64 -w 0 $APK_PATH)
-          # Get SHA if exists
-          SHA=$(curl -s -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/repos/${{ github.repository }}/contents/$DEST?ref=main | python3 -c "import sys,json; print(json.load(sys.stdin).get('sha',''))" 2>/dev/null || echo "")
-          echo "Existing SHA: $SHA"
-          if [ -z "$SHA" ]; then
-            JSON=$(python3 -c "import json,sys; print(json.dumps({'message':'Add modern APK for tablets [skip ci]','content':sys.argv[1],'branch':'main'}))" "$CONTENT")
+          echo "Uploading PURPLE APK via Contents API..."
+          for DEST in "ai-face-detector-purple.apk" "ai-face-detector-modern.apk" "ai-face-detector.apk"; do
+            APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
+            CONTENT=$(base64 -w 0 $APK_PATH)
+            SHA=$(curl -s -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/repos/${{ github.repository }}/contents/$DEST?ref=main | python3 -c "import sys,json; print(json.load(sys.stdin).get('sha',''))" 2>/dev/null || echo "")
+            echo "Uploading $DEST existing SHA: $SHA"
+            if [ -z "$SHA" ]; then
+              JSON=$(python3 -c "import json,sys; print(json.dumps({'message':f'Add purple APK {sys.argv[2]} for tablets [skip ci]','content':sys.argv[1],'branch':'main'}))" "$CONTENT" "$DEST")
+            else
+              JSON=$(python3 -c "import json,sys; print(json.dumps({'message':f'Update purple APK {sys.argv[2]} [skip ci]','content':sys.argv[1],'sha':sys.argv[2],'branch':'main'}))" "$CONTENT" "$SHA" "$DEST")
+            fi
+            curl -s -X PUT -H "Authorization: token $GITHUB_TOKEN" -H "Content-Type: application/json" -d "$JSON" https://api.github.com/repos/${{ github.repository }}/contents/$DEST | head -c 500
+            echo ""
+            sleep 2
+          done
+          echo "Purple APK upload done"
+
+      - name: Commit APK via git - PURPLE
+        if: always() && github.ref == 'refs/heads/main'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action Purple"
+          git pull origin main --rebase || true
+          cp app/build/outputs/apk/debug/app-debug.apk ./ai-face-detector-purple.apk || true
+          cp app/build/outputs/apk/debug/app-debug.apk ./ai-face-detector.apk || true
+          git add ai-face-detector-purple.apk ai-face-detector.apk ai-face-detector-modern.apk app-debug.apk 2>/dev/null || true
+          git add app/src/main/assets/*.tflite 2>/dev/null || true
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
           else
-            JSON=$(python3 -c "import json,sys; print(json.dumps({'message':'Update modern APK for tablets [skip ci]','content':sys.argv[1],'sha':sys.argv[2],'branch':'main'}))" "$CONTENT" "$SHA")
+            git commit -m "Add purple pixel APK for tablets - live camera [skip ci]" || true
+            git push origin HEAD:main || echo "Push failed"
           fi
-          curl -s -X PUT -H "Authorization: token $GITHUB_TOKEN" -H "Content-Type: application/json" -d "$JSON" https://api.github.com/repos/${{ github.repository }}/contents/$DEST | head -c 1000
-          echo ""
-          echo "Modern APK upload done"
 
       - name: Upload Debug APK artifact
         if: always()
@@ -107,15 +126,15 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: warn
 
-      - name: Create Release with APK via gh CLI
+      - name: Create Release with PURPLE APK via gh CLI
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG=v1.0.${{ github.run_number }}
+          TAG=v1.0.${{ github.run_number }}-purple
           echo "Creating release $TAG"
-          gh release create $TAG --title "AI Face Detector $TAG - Modern APK for tablets" --notes "Modern APK with targetSdk 34, works on tablets and phones" --target main || echo "Create failed"
+          gh release create $TAG --title "AI Face Detector PURPLE $TAG - Live Camera" --notes "Purple pixel font, live camera face detection, targetSdk 34 for tablets" --target main || echo "Create failed"
           ls -lh *.apk app/build/outputs/apk/debug/*.apk || true
-          gh release upload $TAG app/build/outputs/apk/debug/app-debug.apk --clobber || echo "Upload app-debug failed"
-          gh release upload $TAG ./ai-face-detector.apk --clobber || echo "Upload ai-face-detector failed"
+          gh release upload $TAG app/build/outputs/apk/debug/app-debug.apk --clobber || echo "Upload failed"
+          gh release upload $TAG ./ai-face-detector-purple.apk --clobber || echo "Upload purple failed"
           echo "Done"
