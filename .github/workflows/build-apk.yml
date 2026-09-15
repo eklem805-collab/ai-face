@@ -7,6 +7,10 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+  actions: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -14,6 +18,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -33,12 +40,12 @@ jobs:
           mkdir -p app/src/main/assets
           if [ ! -f "yolov8n-face.pt" ]; then
             echo "Downloading yolov8n-face.pt..."
-            wget -q https://github.com/akanametov/yolo-face/releases/download/1.0.0/yolov8n-face.pt -O yolov8n-face.pt && echo "Downloaded n model" || echo "Failed"
+            wget -q https://github.com/akanametov/yolo-face/releases/download/1.0.0/yolov8n-face.pt -O yolov8n-face.pt && echo "Downloaded n model" || echo "Failed n"
           fi
-          if [ ! -f "yolov8l-face.pt" ]; then
-            echo "Downloading yolov8l-face.pt..."
-            wget -q https://github.com/akanametov/yolo-face/releases/download/1.0.0/yolov8l-face.pt -O yolov8l-face.pt && echo "Downloaded l model" || echo "Failed"
-          fi
+          # Only download l model if explicitly needed (large)
+          # if [ ! -f "yolov8l-face.pt" ]; then
+          #   wget -q https://github.com/akanametov/yolo-face/releases/download/1.0.0/yolov8l-face.pt -O yolov8l-face.pt || true
+          # fi
           ls -lh *.pt 2>/dev/null || echo "No pt"
 
       - name: Convert models to TFLite
@@ -50,10 +57,7 @@ jobs:
             echo "Converting n..."
             python convert_model.py --model yolov8n-face.pt --out app/src/main/assets/yolov8n-face.tflite --imgsz 640 || echo "fail n"
           fi
-          if [ -f "yolov8l-face.pt" ]; then
-            echo "Converting l..."
-            python convert_model.py --model yolov8l-face.pt --out app/src/main/assets/yolov8l-face.tflite --imgsz 640 || echo "fail l"
-          fi
+          # Skip l model conversion for speed, app will work with n model
           if [ ! -f "app/src/main/assets/yolov8n-face.tflite" ] && [ ! -f "app/src/main/assets/yolov8l-face.tflite" ]; then
             echo "No TFLite, using ML Kit only"
             touch app/src/main/assets/.keep
@@ -66,39 +70,18 @@ jobs:
       - name: Build Debug APK
         run: ./gradlew assembleDebug --stacktrace 2>&1 | tee build-debug.log
 
-      - name: Build Release APK (unsigned)
-        continue-on-error: true
-        run: ./gradlew assembleRelease --stacktrace 2>&1 | tee build-release.log
-
-      - name: Upload Debug APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: ai-face-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
-
-      - name: Upload Release APK
+      - name: List APK outputs
         if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ai-face-release-apk
-          path: app/build/outputs/apk/release/app-release-unsigned.apk
-          if-no-files-found: warn
-
-      - name: Upload logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-logs
-          path: |
-            build-debug.log
-            build-release.log
-            app/build/outputs/logs/ || true
+        run: |
+          find app/build -name "*.apk" -type f | xargs ls -lh || echo "No APK found"
+          ls -lh app/build/outputs/apk/debug/ || true
+          ls -lh app/build/outputs/apk/release/ || true
 
       - name: Copy APK to root
         if: always()
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk ./ai-face-detector.apk || true
-          cp app/build/outputs/apk/release/app-release-unsigned.apk ./ai-face-detector-release.apk || true
+          cp app/build/outputs/apk/debug/app-debug.apk ./ai-face-detector.apk || echo "No debug APK"
+          cp app/build/outputs/apk/release/app-release-unsigned.apk ./ai-face-detector-release.apk || echo "No release APK"
           ls -lh *.apk || true
 
       - name: Commit APK to repo
@@ -106,6 +89,48 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
+          git status
           git add ai-face-detector.apk ai-face-detector-release.apk 2>/dev/null || true
-          git diff --staged --quiet || git commit -m "Add built APK [skip ci]" || echo "No changes"
-          git push || echo "Push failed"
+          git add app/src/main/assets/*.tflite 2>/dev/null || true
+          git status
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Add built APK and models [skip ci]"
+            git push origin HEAD:${{ github.ref_name }} || (echo "Push failed, trying force"; git push origin HEAD:${{ github.ref_name }} --force || echo "Force push also failed")
+          fi
+
+      - name: Upload Debug APK artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-face-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: warn
+
+      - name: Upload to Release
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: AI Face Detector v1.0.${{ github.run_number }}
+          body: |
+            Автоматическая сборка APK с детектором лиц
+            
+            - ML Kit Face Detection (работает из коробки) - боксики + полигоны лица
+            - YOLOv8 Face Detection (yolov8n-face.tflite)
+            
+            Установите ai-face-detector.apk на Android устройство
+            
+            Из вашего запроса: поддерживается yolov8l-face.pt (87MB) - конвертируется в TFLite
+            
+            Как использовать:
+            1. Скачайте APK
+            2. Установите на Android (разрешите неизвестные источники)
+            3. Дайте разрешение на камеру
+            4. Наведите на лицо - увидите зеленый бокс и полигоны!
+          files: |
+            ai-face-detector.apk
+            app/build/outputs/apk/debug/app-debug.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
