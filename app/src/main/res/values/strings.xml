@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">AI Face Detector</string>
+    <string name="permission_camera_rationale">Нужно разрешение камеры для детекции лица</string>
+    <string name="mode_mlkit">ML Kit</string>
+    <string name="mode_yolo">YOLOv8</string>
+    <string name="fps">FPS: %.1f</string>
+    <string name="faces_count">Лиц: %d</string>
+    <string name="switch_camera">Сменить камеру</string>
+    <string name="toggle_mode">Режим</string>
+</resources>

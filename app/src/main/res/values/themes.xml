@@ -1,0 +1,7 @@
+<resources>
+    <style name="Theme.AiFace" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/primary</item>
+        <item name="android:statusBarColor">@color/black</item>
+        <item name="android:windowFullscreen">false</item>
+    </style>
+</resources>
