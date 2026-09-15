@@ -436,5 +436,5 @@ The following AndroidX dependencies are detected:
 	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:47)
 
 
-BUILD FAILED in 12s
+BUILD FAILED in 10s
 2 actionable tasks: 2 executed
