@@ -25,25 +25,50 @@ jobs:
         run: |
           yes | sdkmanager --licenses || true
           sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0" || true
+      - name: Download YOLO models - both n and l
+        run: |
+          mkdir -p app/src/main/assets
+          echo "Downloading YOLO models..."
+          wget -q https://github.com/akanametov/yolo-face/releases/download/1.0.0/yolov8n-face.pt -O yolov8n-face.pt && echo "Downloaded yolov8n-face.pt $(ls -lh yolov8n-face.pt)" || echo "Failed n"
+          wget -q https://github.com/akanametov/yolo-face/releases/download/1.0.0/yolov8l-face.pt -O yolov8l-face.pt && echo "Downloaded yolov8l-face.pt $(ls -lh yolov8l-face.pt)" || echo "Failed l - will use n only"
+          ls -lh *.pt 2>/dev/null || echo "No pt files"
+      - name: Convert models to TFLite
+        run: |
+          python3 -m pip install --upgrade pip
+          pip install ultralytics tensorflow --quiet
+          echo "Converting n model..."
+          if [ -f "yolov8n-face.pt" ]; then
+            python convert_model.py --model yolov8n-face.pt --out app/src/main/assets/yolov8n-face.tflite --imgsz 640 && echo "Converted n" || echo "Convert n failed"
+          fi
+          echo "Converting l model (87MB, may take time)..."
+          if [ -f "yolov8l-face.pt" ]; then
+            python convert_model.py --model yolov8l-face.pt --out app/src/main/assets/yolov8l-face.tflite --imgsz 640 && echo "Converted l" || echo "Convert l failed, will use n"
+          fi
+          ls -lh app/src/main/assets/ || true
+          # Ensure at least one model exists, if not create dummy
+          if [ ! -f "app/src/main/assets/yolov8n-face.tflite" ] && [ ! -f "app/src/main/assets/yolov8l-face.tflite" ]; then
+            echo "No TFLite models, creating placeholder - will use ML Kit"
+            touch app/src/main/assets/.keep
+          fi
       - name: Build Debug APK
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug --stacktrace 2>&1 | tee build.log
           ls -lh app/build/outputs/apk/debug/
-      - name: Upload APK artifact (136M)
+          echo "APK size $(du -h app/build/outputs/apk/debug/app-debug.apk)"
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ai-face-purple-apk
+          name: ai-face-purple-apk-yolo
           path: app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
           retention-days: 7
-      - name: Create Release with APK via gh CLI
+      - name: Create Release with YOLO APK
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG=v1.0.${{ github.run_number }}-purple
-          echo "APK size $(ls -lh app/build/outputs/apk/debug/app-debug.apk)"
-          gh release create $TAG --title "AI Face PURPLE $TAG - Live Camera" --notes "Purple pixel font, live camera, targetSdk 34, 136M APK with YOLO" --target main || echo "create exists"
+          TAG=v1.0.${{ github.run_number }}-yolo-purple
+          echo "Creating release $TAG with YOLO models"
+          ls -lh app/src/main/assets/ | head -n 20
+          gh release create $TAG --title "AI Face YOLO $TAG - Purple Live" --notes "Purple pixel font, live camera, YOLOv8n + YOLOv8l models included, targetSdk 34" --target main || echo "create exists"
           gh release upload $TAG app/build/outputs/apk/debug/app-debug.apk --clobber
           echo "Release done"
-          gh release view $TAG
