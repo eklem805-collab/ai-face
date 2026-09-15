@@ -3,138 +3,50 @@ name: Build APK
 on:
   push:
     branches: [ main, arena/* ]
-  pull_request:
-    branches: [ main ]
   workflow_dispatch:
 
 permissions:
   contents: write
-  actions: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
           cache: gradle
-
       - name: Setup Android SDK
         run: |
           yes | sdkmanager --licenses || true
           sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0" || true
-
-      - name: Download YOLO models
-        run: |
-          mkdir -p app/src/main/assets
-          if [ ! -f "yolov8n-face.pt" ]; then
-            wget -q https://github.com/akanametov/yolo-face/releases/download/1.0.0/yolov8n-face.pt -O yolov8n-face.pt && echo "Downloaded n" || echo "Failed n"
-          fi
-          ls -lh *.pt 2>/dev/null || echo "No pt"
-
-      - name: Convert models to TFLite
-        continue-on-error: true
-        run: |
-          python3 -m pip install --upgrade pip
-          pip install ultralytics tensorflow --quiet
-          if [ -f "yolov8n-face.pt" ]; then
-            python convert_model.py --model yolov8n-face.pt --out app/src/main/assets/yolov8n-face.tflite --imgsz 640 || echo "fail n"
-          fi
-          if [ ! -f "app/src/main/assets/yolov8n-face.tflite" ]; then
-            touch app/src/main/assets/.keep
-          fi
-          ls -lh app/src/main/assets/
-
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-
       - name: Build Debug APK
-        run: ./gradlew assembleDebug --stacktrace 2>&1 | tee build-debug.log
-
-      - name: List APK outputs
-        if: always()
         run: |
-          find app/build -name "*.apk" -type f | xargs ls -lh || echo "No APK"
-          ls -lh app/build/outputs/apk/debug/ || true
-
-      - name: Copy APK to root
-        if: always()
-        run: |
-          cp app/build/outputs/apk/debug/app-debug.apk ./ai-face-detector.apk || echo "No debug APK"
-          cp app/build/outputs/apk/debug/app-debug.apk ./app-debug.apk || echo "No debug APK2"
-          cp app/build/outputs/apk/debug/app-debug.apk ./ai-face-detector-purple.apk || echo "No debug APK purple"
-          ls -lh *.apk || true
-
-      - name: Upload APK via Contents API - PURPLE MODERN for tablets
-        if: always() && github.ref == 'refs/heads/main'
+          chmod +x gradlew
+          ./gradlew assembleDebug --stacktrace | tee build.log
+          ls -lh app/build/outputs/apk/debug/
+      - name: Upload PURPLE APK to main branch via API
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if [ ! -f "app/build/outputs/apk/debug/app-debug.apk" ]; then
-            echo "No APK to upload"
-            exit 0
-          fi
-          echo "Uploading PURPLE APK via Contents API..."
-          for DEST in "ai-face-detector-purple.apk" "ai-face-detector-modern.apk" "ai-face-detector.apk"; do
-            APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
-            CONTENT=$(base64 -w 0 $APK_PATH)
-            SHA=$(curl -s -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/repos/${{ github.repository }}/contents/$DEST?ref=main | python3 -c "import sys,json; print(json.load(sys.stdin).get('sha',''))" 2>/dev/null || echo "")
-            echo "Uploading $DEST existing SHA: $SHA"
-            if [ -z "$SHA" ]; then
-              JSON=$(python3 -c "import json,sys; print(json.dumps({'message':f'Add purple APK {sys.argv[2]} for tablets [skip ci]','content':sys.argv[1],'branch':'main'}))" "$CONTENT" "$DEST")
-            else
-              JSON=$(python3 -c "import json,sys; print(json.dumps({'message':f'Update purple APK {sys.argv[2]} [skip ci]','content':sys.argv[1],'sha':sys.argv[2],'branch':'main'}))" "$CONTENT" "$SHA" "$DEST")
-            fi
-            curl -s -X PUT -H "Authorization: token $GITHUB_TOKEN" -H "Content-Type: application/json" -d "$JSON" https://api.github.com/repos/${{ github.repository }}/contents/$DEST | head -c 500
-            echo ""
-            sleep 2
-          done
-          echo "Purple APK upload done"
-
-      - name: Commit APK via git - PURPLE
-        if: always() && github.ref == 'refs/heads/main'
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action Purple"
-          git pull origin main --rebase || true
-          cp app/build/outputs/apk/debug/app-debug.apk ./ai-face-detector-purple.apk || true
-          cp app/build/outputs/apk/debug/app-debug.apk ./ai-face-detector.apk || true
-          git add ai-face-detector-purple.apk ai-face-detector.apk ai-face-detector-modern.apk app-debug.apk 2>/dev/null || true
-          git add app/src/main/assets/*.tflite 2>/dev/null || true
-          if git diff --staged --quiet; then
-            echo "No changes to commit"
-          else
-            git commit -m "Add purple pixel APK for tablets - live camera [skip ci]" || true
-            git push origin HEAD:main || echo "Push failed"
-          fi
-
-      - name: Upload Debug APK artifact
-        if: always()
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          if [ ! -f "$APK" ]; then echo "No APK"; exit 1; fi
+          echo "APK exists $(ls -lh $APK)"
+          DEST="ai-face-detector-purple.apk"
+          B64=$(base64 -w 0 $APK)
+          echo "Base64 len ${#B64}"
+          # Try without SHA first (create)
+          JSON=$(python3 -c "import json,sys; print(json.dumps({'message':'Add purple APK live camera [skip ci]','content':sys.argv[1],'branch':'main'}))" "$B64")
+          curl -v -X PUT -H "Authorization: token $GITHUB_TOKEN" -H "Content-Type: application/json" -d "$JSON" https://api.github.com/repos/${{ github.repository }}/contents/$DEST 2>&1 | head -n 50
+          echo ""
+          echo "Upload done"
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ai-face-debug-apk
+          name: purple-apk
           path: app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: warn
-
-      - name: Create Release with PURPLE APK via gh CLI
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          TAG=v1.0.${{ github.run_number }}-purple
-          echo "Creating release $TAG"
-          gh release create $TAG --title "AI Face Detector PURPLE $TAG - Live Camera" --notes "Purple pixel font, live camera face detection, targetSdk 34 for tablets" --target main || echo "Create failed"
-          ls -lh *.apk app/build/outputs/apk/debug/*.apk || true
-          gh release upload $TAG app/build/outputs/apk/debug/app-debug.apk --clobber || echo "Upload failed"
-          gh release upload $TAG ./ai-face-detector-purple.apk --clobber || echo "Upload purple failed"
-          echo "Done"
