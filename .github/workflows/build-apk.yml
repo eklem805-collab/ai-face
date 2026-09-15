@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
   build:
@@ -28,40 +29,21 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug --stacktrace 2>&1 | tee build.log
-          echo "===BUILD LOG END==="
-          ls -lh app/build/outputs/apk/debug/ || true
-          cat build.log | tail -n 100
-      - name: Upload build.log to main branch for debugging
-        if: always()
+          ls -lh app/build/outputs/apk/debug/
+      - name: Upload APK artifact (136M)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-face-purple-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
+      - name: Create Release with APK via gh CLI
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if [ ! -f "build.log" ]; then echo "No build.log"; exit 0; fi
-          B64=$(base64 -w 0 build.log)
-          DEST="build.log"
-          SHA=$(curl -s -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/repos/${{ github.repository }}/contents/$DEST?ref=main | python3 -c "import sys,json; print(json.load(sys.stdin).get('sha',''))" 2>/dev/null || echo "")
-          if [ -z "$SHA" ]; then
-            JSON=$(python3 -c "import json,sys; print(json.dumps({'message':'Add build log [skip ci]','content':sys.argv[1],'branch':'main'}))" "$B64")
-          else
-            JSON=$(python3 -c "import json,sys; print(json.dumps({'message':'Update build log [skip ci]','content':sys.argv[1],'sha':sys.argv[2],'branch':'main'}))" "$B64" "$SHA")
-          fi
-          curl -s -X PUT -H "Authorization: token $GITHUB_TOKEN" -H "Content-Type: application/json" -d "$JSON" https://api.github.com/repos/${{ github.repository }}/contents/$DEST | head -c 500
-          echo ""
-      - name: Upload APK to main branch if exists
-        if: always()
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          APK="app/build/outputs/apk/debug/app-debug.apk"
-          if [ ! -f "$APK" ]; then echo "No APK at $APK"; ls -lh app/build/ || true; exit 0; fi
-          echo "APK found $(ls -lh $APK)"
-          DEST="ai-face-detector-purple.apk"
-          B64=$(base64 -w 0 $APK)
-          SHA=$(curl -s -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/repos/${{ github.repository }}/contents/$DEST?ref=main | python3 -c "import sys,json; print(json.load(sys.stdin).get('sha',''))" 2>/dev/null || echo "")
-          if [ -z "$SHA" ]; then
-            JSON=$(python3 -c "import json,sys; print(json.dumps({'message':'Add purple APK [skip ci]','content':sys.argv[1],'branch':'main'}))" "$B64")
-          else
-            JSON=$(python3 -c "import json,sys; print(json.dumps({'message':'Update purple APK [skip ci]','content':sys.argv[1],'sha':sys.argv[2],'branch':'main'}))" "$B64" "$SHA")
-          fi
-          curl -s -X PUT -H "Authorization: token $GITHUB_TOKEN" -H "Content-Type: application/json" -d "$JSON" https://api.github.com/repos/${{ github.repository }}/contents/$DEST | head -c 500
-          echo ""
+          TAG=v1.0.${{ github.run_number }}-purple
+          echo "APK size $(ls -lh app/build/outputs/apk/debug/app-debug.apk)"
+          gh release create $TAG --title "AI Face PURPLE $TAG - Live Camera" --notes "Purple pixel font, live camera, targetSdk 34, 136M APK with YOLO" --target main || echo "create exists"
+          gh release upload $TAG app/build/outputs/apk/debug/app-debug.apk --clobber
+          echo "Release done"
+          gh release view $TAG
