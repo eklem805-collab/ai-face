@@ -71,47 +71,8 @@ jobs:
         if: always()
         run: |
           cp app/build/outputs/apk/debug/app-debug.apk ./ai-face-detector.apk || echo "No debug APK"
+          cp app/build/outputs/apk/debug/app-debug.apk ./app-debug.apk || echo "No debug APK2"
           ls -lh *.apk || true
-
-      - name: Upload APK via GitHub API (bypass git push issues)
-        if: always() && github.event_name == 'push'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          if [ ! -f "ai-face-detector.apk" ]; then
-            echo "No APK to upload via API"
-            exit 0
-          fi
-          echo "Uploading APK via GitHub Contents API..."
-          # Get current file SHA if exists
-          SHA=$(curl -s -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/repos/${{ github.repository }}/contents/ai-face-detector.apk?ref=${{ github.ref_name }} | python3 -c "import sys,json; print(json.load(sys.stdin).get('sha',''))" 2>/dev/null || echo "")
-          echo "Existing SHA: $SHA"
-          CONTENT=$(base64 -w 0 ai-face-detector.apk)
-          if [ -z "$SHA" ]; then
-            JSON=$(python3 -c "import json,sys; print(json.dumps({'message':'Add APK via API [skip ci]','content':sys.argv[1],'branch':'${{ github.ref_name }}'}))" "$CONTENT")
-          else
-            JSON=$(python3 -c "import json,sys; print(json.dumps({'message':'Update APK via API [skip ci]','content':sys.argv[1],'sha':sys.argv[2],'branch':'${{ github.ref_name }}'}))" "$CONTENT" "$SHA")
-          fi
-          curl -s -X PUT -H "Authorization: token $GITHUB_TOKEN" -H "Content-Type: application/json" -d "$JSON" https://api.github.com/repos/${{ github.repository }}/contents/ai-face-detector.apk | head -c 500
-          echo ""
-          echo "API upload done"
-
-      - name: Commit APK via git (fallback)
-        if: always() && github.event_name == 'push'
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          # Pull latest to avoid conflicts
-          git pull origin ${{ github.ref_name }} --rebase || true
-          cp app/build/outputs/apk/debug/app-debug.apk ./ai-face-detector.apk || true
-          git add ai-face-detector.apk 2>/dev/null || true
-          git add app/src/main/assets/*.tflite 2>/dev/null || true
-          if git diff --staged --quiet; then
-            echo "No changes"
-          else
-            git commit -m "Add built APK [skip ci]" || true
-            git push origin HEAD:${{ github.ref_name }} || echo "Push failed"
-          fi
 
       - name: Upload Debug APK artifact
         if: always()
@@ -121,28 +82,19 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: warn
 
-      - name: Upload to Release
+      - name: Create Release with APK via gh CLI
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: v1.0.${{ github.run_number }}
-          name: AI Face Detector v1.0.${{ github.run_number }}
-          body: |
-            Автоматическая сборка APK с детектором лиц
-            
-            - ML Kit Face Detection - боксики + полигоны лица
-            - YOLOv8 Face Detection (yolov8n-face.tflite)
-            
-            Установите ai-face-detector.apk на Android устройство
-            Поддерживает yolov8l-face.pt из вашего запроса
-            
-            Установка:
-            1. Скачайте APK из релиза или из корня репозитория (ai-face-detector.apk)
-            2. Установите на Android
-            3. Дайте разрешение на камеру
-            4. Наведите на лицо - увидите бокс!
-          files: |
-            ai-face-detector.apk
-            app/build/outputs/apk/debug/app-debug.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG=v1.0.${{ github.run_number }}
+          echo "Creating release $TAG"
+          # Create release with notes
+          gh release create $TAG --title "AI Face Detector $TAG - Modern APK for tablets" --notes "Modern APK with targetSdk 34, works on tablets and phones\n\n- ML Kit Face Detection - boxes + polygons\n- YOLOv8 Face Detection\n- CameraX\n- Supports Android 6.0+ (API 23+) target 34\n\nInstall ai-face-detector.apk or app-debug.apk\n\nFace detector HTML also available: face-detector.html works in browser" --target main || echo "Release create failed, maybe exists"
+          # Upload APKs
+          ls -lh *.apk app/build/outputs/apk/debug/*.apk || true
+          gh release upload $TAG app/build/outputs/apk/debug/app-debug.apk --clobber || echo "Upload app-debug failed"
+          gh release upload $TAG ./ai-face-detector.apk --clobber || echo "Upload ai-face-detector failed"
+          gh release upload $TAG ./app-debug.apk --clobber || echo "Upload app-debug root failed"
+          echo "Release upload done"
+          gh release view $TAG || true
