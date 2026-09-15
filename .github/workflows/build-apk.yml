@@ -23,7 +23,15 @@ jobs:
           cache: gradle
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          ls -lh $ANDROID_HOME || ls -lh /usr/local/lib/android/sdk || true
+          # Ensure we have build-tools and platforms
+          sdkmanager --list | head -n 20 || true
+          # Install required SDK components if missing
+          yes | sdkmanager --licenses || true
+          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0" || true
 
       - name: Download YOLO models
         run: |
@@ -33,21 +41,22 @@ jobs:
           # Try to download yolov8n-face.pt (small, 6MB) - best for mobile
           if [ ! -f "yolov8n-face.pt" ]; then
             echo "Downloading yolov8n-face.pt..."
-            wget -q https://github.com/akanametov/yolo-face/releases/download/1.0.0/yolov8n-face.pt -O yolov8n-face.pt || echo "Failed to download n model"
+            wget -q https://github.com/akanametov/yolo-face/releases/download/1.0.0/yolov8n-face.pt -O yolov8n-face.pt && echo "Downloaded n model" || echo "Failed to download n model"
           fi
           
           # Try to download yolov8l-face.pt (large, 87MB) if requested
           if [ ! -f "yolov8l-face.pt" ]; then
             echo "Downloading yolov8l-face.pt..."
-            wget -q https://github.com/akanametov/yolo-face/releases/download/1.0.0/yolov8l-face.pt -O yolov8l-face.pt || echo "Failed to download l model"
+            wget -q https://github.com/akanametov/yolo-face/releases/download/1.0.0/yolov8l-face.pt -O yolov8l-face.pt && echo "Downloaded l model" || echo "Failed to download l model"
           fi
           
           ls -lh *.pt 2>/dev/null || echo "No .pt models downloaded"
 
       - name: Convert models to TFLite
+        continue-on-error: true
         run: |
+          python3 -m pip install --upgrade pip
           pip install ultralytics tensorflow --quiet
-          pip install onnx onnxruntime --quiet
           
           # Convert n model (priority for mobile)
           if [ -f "yolov8n-face.pt" ]; then
@@ -64,7 +73,6 @@ jobs:
           # If no model converted, create dummy to allow build
           if [ ! -f "app/src/main/assets/yolov8n-face.tflite" ] && [ ! -f "app/src/main/assets/yolov8l-face.tflite" ]; then
             echo "No TFLite models found, app will use ML Kit only"
-            # Create empty assets folder to allow build
             touch app/src/main/assets/.keep
           fi
           
@@ -74,7 +82,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build Debug APK
-        run: ./gradlew assembleDebug --stacktrace
+        run: ./gradlew assembleDebug --stacktrace --info
 
       - name: Build Release APK (unsigned)
         run: ./gradlew assembleRelease --stacktrace
@@ -91,46 +99,20 @@ jobs:
           name: ai-face-release-apk
           path: app/build/outputs/apk/release/app-release-unsigned.apk
 
+      - name: Copy APK to root
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk ./ai-face-detector.apk || true
+          cp app/build/outputs/apk/release/app-release-unsigned.apk ./ai-face-detector-release.apk || true
+          ls -lh *.apk || true
+
       - name: Commit APK to repo (if on main or arena branch)
         if: github.event_name == 'push'
         run: |
-          # Copy APK to root for easy download via git
-          cp app/build/outputs/apk/debug/app-debug.apk ./ai-face-detector.apk || true
-          cp app/build/outputs/apk/release/app-release-unsigned.apk ./ai-face-detector-release.apk || true
-          
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           
-          # Check if APK changed
           git add ai-face-detector.apk ai-face-detector-release.apk 2>/dev/null || true
           git diff --staged --quiet || git commit -m "Add built APK [skip ci]" || echo "No changes to commit"
           
-          # Push only if we have token and not PR
-          if [ "${{ github.event_name }}" == "push" ]; then
-            git push || echo "Push failed, maybe protected branch"
-          fi
-
-      - name: Create Release with APK
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: v1.0.${{ github.run_number }}
-          name: AI Face Detector v1.0.${{ github.run_number }}
-          body: |
-            Автоматическая сборка APK с детектором лиц
-            
-            - ML Kit Face Detection (работает из коробки)
-            - YOLOv8 Face Detection (если модели загружены)
-            
-            Установите ai-face-detector.apk на Android устройство
-            
-            Модели YOLO:
-            - yolov8n-face.pt (6MB) - быстрая
-            - yolov8l-face.pt (87MB) - точная
-            
-            Конвертация: python convert_model.py --model yolov8l-face.pt
-          files: |
-            app/build/outputs/apk/debug/app-debug.apk
-            app/build/outputs/apk/release/app-release-unsigned.apk
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Push
+          git push || echo "Push failed, maybe protected branch"
