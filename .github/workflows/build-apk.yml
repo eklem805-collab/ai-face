@@ -25,24 +25,21 @@ jobs:
       - name: Setup Android SDK
         run: |
           echo "ANDROID_HOME=$ANDROID_HOME"
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
-          ls -lh $ANDROID_HOME || ls -lh /usr/local/lib/android/sdk || true
           yes | sdkmanager --licenses || true
           sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0" || true
 
       - name: Download YOLO models
         run: |
           mkdir -p app/src/main/assets
-          echo "Downloading YOLO face models..."
           if [ ! -f "yolov8n-face.pt" ]; then
             echo "Downloading yolov8n-face.pt..."
-            wget -q https://github.com/akanametov/yolo-face/releases/download/1.0.0/yolov8n-face.pt -O yolov8n-face.pt && echo "Downloaded n model" || echo "Failed to download n model"
+            wget -q https://github.com/akanametov/yolo-face/releases/download/1.0.0/yolov8n-face.pt -O yolov8n-face.pt && echo "Downloaded n model" || echo "Failed"
           fi
           if [ ! -f "yolov8l-face.pt" ]; then
             echo "Downloading yolov8l-face.pt..."
-            wget -q https://github.com/akanametov/yolo-face/releases/download/1.0.0/yolov8l-face.pt -O yolov8l-face.pt && echo "Downloaded l model" || echo "Failed to download l model"
+            wget -q https://github.com/akanametov/yolo-face/releases/download/1.0.0/yolov8l-face.pt -O yolov8l-face.pt && echo "Downloaded l model" || echo "Failed"
           fi
-          ls -lh *.pt 2>/dev/null || echo "No .pt models downloaded"
+          ls -lh *.pt 2>/dev/null || echo "No pt"
 
       - name: Convert models to TFLite
         continue-on-error: true
@@ -50,74 +47,62 @@ jobs:
           python3 -m pip install --upgrade pip
           pip install ultralytics tensorflow --quiet
           if [ -f "yolov8n-face.pt" ]; then
-            echo "Converting yolov8n-face.pt to TFLite..."
-            python convert_model.py --model yolov8n-face.pt --out app/src/main/assets/yolov8n-face.tflite --imgsz 640 || echo "Conversion failed for n model"
+            echo "Converting n..."
+            python convert_model.py --model yolov8n-face.pt --out app/src/main/assets/yolov8n-face.tflite --imgsz 640 || echo "fail n"
           fi
           if [ -f "yolov8l-face.pt" ]; then
-            echo "Converting yolov8l-face.pt to TFLite..."
-            python convert_model.py --model yolov8l-face.pt --out app/src/main/assets/yolov8l-face.tflite --imgsz 640 || echo "Conversion failed for l model"
+            echo "Converting l..."
+            python convert_model.py --model yolov8l-face.pt --out app/src/main/assets/yolov8l-face.tflite --imgsz 640 || echo "fail l"
           fi
           if [ ! -f "app/src/main/assets/yolov8n-face.tflite" ] && [ ! -f "app/src/main/assets/yolov8l-face.tflite" ]; then
-            echo "No TFLite models found, app will use ML Kit only"
+            echo "No TFLite, using ML Kit only"
             touch app/src/main/assets/.keep
           fi
-          ls -lh app/src/main/assets/ || echo "No assets"
+          ls -lh app/src/main/assets/
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
       - name: Build Debug APK
-        id: build_debug
-        run: |
-          ./gradlew assembleDebug --stacktrace 2>&1 | tee build.log
-          echo "Exit code: ${PIPESTATUS[0]}"
-          exit ${PIPESTATUS[0]}
-
-      - name: Upload build log on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-log
-          path: build.log
-
-      - name: Save log to repo on failure
-        if: failure()
-        run: |
-          mkdir -p logs
-          cp build.log logs/build-${{ github.run_number }}.log || true
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add logs/ || true
-          git commit -m "Add build log ${{ github.run_number }} [skip ci]" || true
-          git push || true
+        run: ./gradlew assembleDebug --stacktrace 2>&1 | tee build-debug.log
 
       - name: Build Release APK (unsigned)
-        if: success()
-        run: ./gradlew assembleRelease --stacktrace
+        continue-on-error: true
+        run: ./gradlew assembleRelease --stacktrace 2>&1 | tee build-release.log
 
       - name: Upload Debug APK
-        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: ai-face-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload Release APK
-        if: success()
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ai-face-release-apk
           path: app/build/outputs/apk/release/app-release-unsigned.apk
+          if-no-files-found: warn
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            build-debug.log
+            build-release.log
+            app/build/outputs/logs/ || true
 
       - name: Copy APK to root
-        if: success()
+        if: always()
         run: |
           cp app/build/outputs/apk/debug/app-debug.apk ./ai-face-detector.apk || true
           cp app/build/outputs/apk/release/app-release-unsigned.apk ./ai-face-detector-release.apk || true
           ls -lh *.apk || true
 
       - name: Commit APK to repo
-        if: success() && github.event_name == 'push'
+        if: github.event_name == 'push'
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
