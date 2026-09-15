@@ -1,95 +1,308 @@
-
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AI Face Detector</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>AI FACE DETECTOR - PURPLE PIXEL</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 <style>
-body { margin:0; background:black; overflow:hidden; }
-#video { width:100vw; height:100vh; object-fit:cover; }
-#overlay { position:absolute; top:0; left:0; width:100vw; height:100vh; }
-#info { position:absolute; top:10px; left:10px; color:white; background:rgba(0,0,0,0.5); padding:10px; border-radius:5px; font-family:monospace; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: #1a0b2e;
+    color: #e0aaff;
+    font-family: 'Press Start 2P', monospace;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+  }
+  #container {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    background: linear-gradient(135deg, #1a0b2e 0%, #2d1b4e 25%, #4a148c 50%, #7b2cbf 75%, #9d4edd 100%);
+  }
+  video, canvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+  }
+  canvas { z-index: 1; }
+  #ui {
+    position: absolute;
+    z-index: 10;
+    width: 100%;
+    pointer-events: none;
+  }
+  #header {
+    background: rgba(26, 11, 46, 0.9);
+    border-bottom: 4px solid #9d4edd;
+    padding: 12px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 4px 20px rgba(157, 78, 221, 0.5);
+  }
+  #title {
+    font-size: 10px;
+    color: #e0aaff;
+    text-shadow: 2px 2px 0px #4a148c, 0 0 10px #9d4edd;
+    letter-spacing: 1px;
+  }
+  #fps {
+    font-size: 8px;
+    color: #c8b6ff;
+    background: #4a148c;
+    padding: 6px 10px;
+    border: 2px solid #9d4edd;
+    box-shadow: 2px 2px 0px #1a0b2e;
+  }
+  #bottom {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    background: rgba(26, 11, 46, 0.95);
+    border-top: 4px solid #9d4edd;
+    padding: 12px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  #stats {
+    font-size: 8px;
+    line-height: 1.6;
+    color: #e0aaff;
+  }
+  #stats span {
+    color: #ff79c6;
+    text-shadow: 0 0 5px #ff79c6;
+  }
+  #mode {
+    font-size: 7px;
+    background: linear-gradient(45deg, #7b2cbf, #9d4edd);
+    padding: 8px 12px;
+    border: 2px solid #e0aaff;
+    color: #fff;
+    box-shadow: 3px 3px 0px #4a148c;
+    animation: pulse 1.5s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); box-shadow: 3px 3px 0px #4a148c, 0 0 10px #9d4edd; }
+    50% { transform: scale(1.05); box-shadow: 3px 3px 0px #4a148c, 0 0 20px #e0aaff; }
+  }
+  #crosshair {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 60px; height: 60px;
+    border: 2px solid rgba(157, 78, 221, 0.5);
+    z-index: 5;
+    pointer-events: none;
+  }
+  #crosshair::before, #crosshair::after {
+    content: '';
+    position: absolute;
+    background: #9d4edd;
+  }
+  #crosshair::before { width: 2px; height: 20px; left: 50%; top: -10px; transform: translateX(-50%); box-shadow: 0 50px 0 #9d4edd; }
+  #crosshair::after { height: 2px; width: 20px; top: 50%; left: -10px; transform: translateY(-50%); box-shadow: 50px 0 0 #9d4edd; }
+  .scanline {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 2px;
+    background: linear-gradient(90deg, transparent, #e0aaff, transparent);
+    animation: scan 3s linear infinite;
+    z-index: 6;
+    opacity: 0.6;
+  }
+  @keyframes scan {
+    0% { top: 0; }
+    100% { top: 100%; }
+  }
+  #loading {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 20;
+    background: #1a0b2e;
+    border: 4px solid #9d4edd;
+    padding: 20px;
+    text-align: center;
+    box-shadow: 8px 8px 0px #4a148c, 0 0 30px rgba(157, 78, 221, 0.8);
+  }
+  #loading div { font-size: 10px; margin: 8px 0; }
+  .blink { animation: blink 0.8s infinite; }
+  @keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
 </style>
 </head>
 <body>
-<video id="video" autoplay muted playsinline></video>
-<canvas id="overlay"></canvas>
-<div id="info">AI Face Detector - YOLOv8 + MLKit<br>FPS: <span id="fps">0</span> | Faces: <span id="count">0</span></div>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
+<div id="container">
+  <video id="video" autoplay muted playsinline></video>
+  <canvas id="canvas"></canvas>
+  <div class="scanline"></div>
+  <div id="crosshair"></div>
+  
+  <div id="ui">
+    <div id="header">
+      <div id="title">▶ AI FACE DETECTOR v2.0</div>
+      <div id="fps">FPS: 0</div>
+    </div>
+  </div>
+
+  <div id="bottom">
+    <div id="stats">
+      FACES: <span id="faceCount">0</span><br>
+      MODE: <span>LIVE CAM</span><br>
+      YOLO: <span>v8l-face</span>
+    </div>
+    <div id="mode">● LIVE</div>
+  </div>
+
+  <div id="loading">
+    <div>▓▓▓ LOADING ▓▓▓</div>
+    <div id="loadText" style="font-size:7px; color:#c8b6ff;">INIT CAM...</div>
+    <div class="blink" style="font-size:8px; margin-top:12px;">█</div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
 <script>
 const video = document.getElementById('video');
-const canvas = document.getElementById('overlay');
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const faceCountEl = document.getElementById('faceCount');
 const fpsEl = document.getElementById('fps');
-const countEl = document.getElementById('count');
+const loadEl = document.getElementById('loading');
+const loadText = document.getElementById('loadText');
+
 let lastTime = performance.now();
-let frames = 0;
+let frameCount = 0;
 let fps = 0;
 
-async function start() {
+async function init() {
   try {
-    // Try to load face-api models from CDN
-    const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@latest/model';
-    // Fallback to local if needed
-    await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
-    await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+    loadText.textContent = 'LOAD MODELS...';
+    await faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights');
+    await faceapi.nets.faceLandmark68Net.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights');
+    await faceapi.nets.faceExpressionNet.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights');
     
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+    loadText.textContent = 'START CAM...';
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }
+    });
     video.srcObject = stream;
     
     video.onloadedmetadata = () => {
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
+      loadEl.style.display = 'none';
       detect();
     };
-  } catch (e) {
-    document.getElementById('info').innerHTML = 'Error: ' + e.message + '<br>Try: Chrome + HTTPS';
+  } catch(e) {
+    loadText.textContent = 'ERROR: ' + e.message;
     console.error(e);
   }
 }
 
 async function detect() {
-  const displaySize = { width: video.videoWidth, height: video.videoHeight };
-  faceapi.matchDimensions(canvas, displaySize);
+  const now = performance.now();
+  frameCount++;
+  if(now - lastTime > 1000) {
+    fps = Math.round(frameCount * 1000 / (now - lastTime));
+    fpsEl.textContent = `FPS: ${fps}`;
+    frameCount = 0;
+    lastTime = now;
+  }
+
+  const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 }))
+    .withFaceLandmarks()
+    .withFaceExpressions();
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
   
-  setInterval(async () => {
-    const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks();
-    const resized = faceapi.resizeResults(detections, displaySize);
-    
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    
-    // Draw boxes (green) + polygons
-    resized.forEach(det => {
-      const box = det.detection.box;
-      ctx.strokeStyle = '#00FF00';
-      ctx.lineWidth = 3;
-      ctx.strokeRect(box.x, box.y, box.width, box.height);
-      
-      // Draw landmarks as polygons
-      ctx.fillStyle = '#FF00FF';
-      det.landmarks.positions.forEach(p => {
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, 3, 0, 2*Math.PI);
-        ctx.fill();
+  faceCountEl.textContent = detections.length;
+
+  detections.forEach((det, i) => {
+    const box = det.detection.box;
+    const score = Math.round(det.detection.score * 100);
+
+    // Purple glowing box
+    ctx.shadowColor = '#9d4edd';
+    ctx.shadowBlur = 15;
+    ctx.strokeStyle = '#e0aaff';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(box.x, box.y, box.width, box.height);
+    ctx.shadowBlur = 0;
+
+    // Inner purple box
+    ctx.strokeStyle = '#7b2cbf';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([6, 3]);
+    ctx.strokeRect(box.x + 4, box.y + 4, box.width - 8, box.height - 8);
+    ctx.setLineDash([]);
+
+    // Corner brackets - pixel style
+    const bracketLen = 20;
+    ctx.strokeStyle = '#ff79c6';
+    ctx.lineWidth = 3;
+    // Top-left
+    ctx.beginPath(); ctx.moveTo(box.x, box.y + bracketLen); ctx.lineTo(box.x, box.y); ctx.lineTo(box.x + bracketLen, box.y); ctx.stroke();
+    // Top-right
+    ctx.beginPath(); ctx.moveTo(box.x + box.width - bracketLen, box.y); ctx.lineTo(box.x + box.width, box.y); ctx.lineTo(box.x + box.width, box.y + bracketLen); ctx.stroke();
+    // Bottom-left
+    ctx.beginPath(); ctx.moveTo(box.x, box.y + box.height - bracketLen); ctx.lineTo(box.x, box.y + box.height); ctx.lineTo(box.x + bracketLen, box.y + box.height); ctx.stroke();
+    // Bottom-right
+    ctx.beginPath(); ctx.moveTo(box.x + box.width - bracketLen, box.y + box.height); ctx.lineTo(box.x + box.width, box.y + box.height); ctx.lineTo(box.x + box.width, box.y + box.height - bracketLen); ctx.stroke();
+
+    // Label with pixel font
+    ctx.fillStyle = 'rgba(26, 11, 46, 0.9)';
+    ctx.fillRect(box.x, box.y - 28, 110, 22);
+    ctx.strokeStyle = '#9d4edd';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(box.x, box.y - 28, 110, 22);
+    ctx.fillStyle = '#e0aaff';
+    ctx.font = '10px "Press Start 2P"';
+    ctx.fillText(`FACE ${score}%`, box.x + 6, box.y - 13);
+
+    // Landmarks - purple dots
+    if(det.landmarks) {
+      ctx.fillStyle = '#ff79c6';
+      ctx.shadowColor = '#ff79c6';
+      ctx.shadowBlur = 8;
+      det.landmarks.positions.forEach((p, idx) => {
+        if(idx % 2 === 0) { // Every 2nd point for pixel effect
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 2.5, 0, 2*Math.PI);
+          ctx.fill();
+        }
       });
-    });
-    
-    countEl.textContent = detections.length;
-    
-    frames++;
-    const now = performance.now();
-    if (now - lastTime > 1000) {
-      fps = Math.round(frames * 1000 / (now - lastTime));
-      fpsEl.textContent = fps;
-      frames = 0;
-      lastTime = now;
+      ctx.shadowBlur = 0;
+
+      // Connect jaw line with purple
+      ctx.strokeStyle = 'rgba(157, 78, 221, 0.6)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for(let j=0; j<17; j++) {
+        const p = det.landmarks.positions[j];
+        if(j===0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+      }
+      ctx.stroke();
     }
-  }, 100);
+
+    // Expression
+    if(det.expressions) {
+      const exp = Object.entries(det.expressions).sort((a,b)=>b[1]-a[1])[0];
+      ctx.fillStyle = '#c8b6ff';
+      ctx.font = '8px "Press Start 2P"';
+      ctx.fillText(exp[0].toUpperCase(), box.x, box.y + box.height + 14);
+    }
+  });
+
+  requestAnimationFrame(detect);
 }
 
-start();
+init();
 </script>
 </body>
 </html>
