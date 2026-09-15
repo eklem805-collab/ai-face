@@ -4,7 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/black"
+    android:background="@color/purple_dark"
     tools:context=".MainActivity">
 
     <androidx.camera.view.PreviewView
@@ -25,7 +25,17 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <!-- Top info bar -->
+    <!-- Scanline effect overlay -->
+    <View
+        android:layout_width="0dp"
+        android:layout_height="2dp"
+        android:background="#66E0AAFF"
+        android:alpha="0.6"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- Top info bar - PURPLE PIXEL STYLE -->
     <LinearLayout
         android:id="@+id/topBar"
         android:layout_width="0dp"
@@ -33,6 +43,8 @@
         android:background="@color/text_bg"
         android:orientation="horizontal"
         android:padding="12dp"
+        android:elevation="8dp"
+        android:backgroundTint="@color/purple_dark"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
@@ -43,32 +55,43 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="FPS: 0"
-            android:textColor="@color/white"
-            android:textSize="14sp"
-            android:textStyle="bold" />
+            android:textColor="@color/purple_glow"
+            android:textSize="9sp"
+            android:fontFamily="@font/press_start_2p"
+            android:shadowColor="@color/purple_mid"
+            android:shadowDx="2"
+            android:shadowDy="2"
+            android:shadowRadius="4" />
 
         <TextView
             android:id="@+id/facesText"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Лиц: 0"
-            android:textColor="@color/white"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:layout_marginEnd="12dp"/>
+            android:text="FACES: 0"
+            android:textColor="@color/pink_neon"
+            android:textSize="9sp"
+            android:fontFamily="@font/press_start_2p"
+            android:layout_marginEnd="12dp"
+            android:shadowColor="@color/pink_neon"
+            android:shadowDx="0"
+            android:shadowDy="0"
+            android:shadowRadius="8" />
 
         <TextView
             android:id="@+id/modeText"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="ML Kit"
-            android:textColor="@color/secondary"
-            android:textSize="14sp"
-            android:textStyle="bold" />
+            android:text="● LIVE"
+            android:textColor="@color/white"
+            android:textSize="8sp"
+            android:fontFamily="@font/press_start_2p"
+            android:background="@color/purple_light"
+            android:padding="6dp"
+            android:elevation="4dp" />
 
     </LinearLayout>
 
-    <!-- Bottom controls -->
+    <!-- Bottom controls - PURPLE PIXEL -->
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
@@ -76,6 +99,7 @@
         android:background="@color/text_bg"
         android:padding="12dp"
         android:gravity="center"
+        android:elevation="8dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
@@ -85,8 +109,14 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="@string/switch_camera"
+            android:text="CAM"
+            android:textSize="8sp"
+            android:fontFamily="@font/press_start_2p"
             android:layout_marginEnd="8dp"
+            android:backgroundTint="@color/purple_mid"
+            android:textColor="@color/purple_glow"
+            app:strokeColor="@color/purple_light"
+            app:strokeWidth="2dp"
             style="@style/Widget.Material3.Button.OutlinedButton" />
 
         <com.google.android.material.button.MaterialButton
@@ -94,7 +124,13 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="@string/toggle_mode"
+            android:text="YOLO"
+            android:textSize="8sp"
+            android:fontFamily="@font/press_start_2p"
+            android:backgroundTint="@color/purple_light"
+            android:textColor="@color/white"
+            app:strokeColor="@color/purple_glow"
+            app:strokeWidth="2dp"
             style="@style/Widget.Material3.Button" />
 
     </LinearLayout>
